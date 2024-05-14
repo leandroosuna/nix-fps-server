@@ -8,6 +8,7 @@ namespace nix_fps_server
         public uint id;
         public string name;
         public ushort netId;
+        public short RTT;
 
         public Vector3 position = Vector3.Zero;
         public Vector3 frontDirection = Vector3.Zero;
@@ -15,7 +16,7 @@ namespace nix_fps_server
         public bool connected;
         public bool connectedMessageSent;
         public bool disconnectedMessageSent;
-
+        public int packetCount;
         public Player(uint id)
         {
             this.id = id;

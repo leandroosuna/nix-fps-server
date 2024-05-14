@@ -15,6 +15,7 @@ namespace nix_fps_server
         {
             CheckPlayerMissingEnemies();
             CheckPlayerConnectionState();
+            CheckRTT();
             BroadcastPlayerData();
         }
         public void CheckPlayerConnectionState()
@@ -41,11 +42,19 @@ namespace nix_fps_server
                         Message message = Message.Create(MessageSendMode.Reliable, MessageId.PlayerDisconnected);
                         message.AddUInt(p.id);
                         message.AddString(p.name);
+                        
                         Program.Server.SendToAll(message);
                         p.disconnectedMessageSent = true;
                         p.connectedMessageSent = false;
                     }
                 }
+            }
+        }
+        void CheckRTT()
+        {
+            foreach(var c in Program.Server.Clients)
+            {
+                GetPlayerFromNetId(c.Id).RTT = c.RTT;
             }
         }
         public void SendConnectedMessage(Player p, ushort toId = ushort.MaxValue)
@@ -97,7 +106,7 @@ namespace nix_fps_server
                 message.AddVector3(player.position);
                 message.AddVector3(player.frontDirection);
                 message.AddFloat(player.yaw);
-                Console.WriteLine(players.Count+" id " + player.id + " pos " + player.position + " fd " + player.frontDirection + " y " + player.yaw);
+                //Console.WriteLine(players.Count+" id " + player.id + " pos " + player.position + " fd " + player.frontDirection + " y " + player.yaw);
             }
             Program.Server.SendToAll(message);
         }
@@ -112,6 +121,15 @@ namespace nix_fps_server
             p.frontDirection = message.GetVector3();
             p.yaw = message.GetFloat();
             //Console.WriteLine(p.name +" ("+id+ ") at "+p.position);
+            p.packetCount++;
+        }
+        public void ShowPacketCount()
+        {
+            players.ForEach(p => Console.WriteLine(p.name +" "+p.packetCount));
+        }
+        public void ClearPacketCount()
+        {
+            players.ForEach(p =>  p.packetCount = 0 );
         }
 
         public static void HandleConnect(ushort id)
@@ -127,7 +145,7 @@ namespace nix_fps_server
             Console.WriteLine("handle disconnect");
         }
 
-        static Player GetPlayerFromNetId(ushort id)
+        public static Player GetPlayerFromNetId(ushort id)
         {
             foreach (var player in players)
             {
@@ -139,7 +157,7 @@ namespace nix_fps_server
             return new Player(uint.MaxValue);
         }
 
-        static Player GetPlayerFromId(uint id, bool createIfNull = false)
+        public static Player GetPlayerFromId(uint id, bool createIfNull = false)
         {
             foreach (var player in players)
             {
