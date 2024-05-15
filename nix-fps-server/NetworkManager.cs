@@ -92,12 +92,13 @@ namespace nix_fps_server
             p.name = playerName;
             p.netId = fromClientId;
             p.connected = true;
-            //players.Add(p);
             playersMissingEnemies.Add(p);
         }
-
+        public int outboundPackets = 0;
         public void BroadcastPlayerData()
         {
+            //if (players.Count == 0)
+            //    return;
             Message message = Message.Create(MessageSendMode.Unreliable, MessageId.AllPlayerData);
             message.AddInt(players.Count);
             foreach (Player player in players)
@@ -109,6 +110,7 @@ namespace nix_fps_server
                 //Console.WriteLine(players.Count+" id " + player.id + " pos " + player.position + " fd " + player.frontDirection + " y " + player.yaw);
             }
             Program.Server.SendToAll(message);
+            outboundPackets++;
         }
 
         
@@ -125,24 +127,33 @@ namespace nix_fps_server
         }
         public void ShowPacketCount()
         {
-            players.ForEach(p => Console.WriteLine(p.name +" "+p.packetCount));
+            int count = 0;
+            foreach(var c in Program.Server.Clients)
+            {
+                count += c.Metrics.UnreliableIn;
+                var player = GetPlayerFromNetId(c.Id);
+                Console.WriteLine(player.name + " " + c.Metrics.UnreliableIn + " pps in");
+            }
+            Console.WriteLine("total pps in" + count); 
         }
         public void ClearPacketCount()
         {
-            players.ForEach(p =>  p.packetCount = 0 );
+            foreach (var c in Program.Server.Clients)
+            {
+                c.Metrics.Reset();
+            }
         }
-
         public static void HandleConnect(ushort id)
         {
             //var player = GetPlayerFromNetId(id);
             //player.connected = true;
-            Console.WriteLine("handle connect");
+            //Console.WriteLine("handle connect");
         }
         public static void HandleDisconnect(ushort id)
         {
             var player = GetPlayerFromNetId(id);
             player.connected = false;
-            Console.WriteLine("handle disconnect");
+            //Console.WriteLine("handle disconnect");
         }
 
         public static Player GetPlayerFromNetId(ushort id)
