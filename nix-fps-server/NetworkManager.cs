@@ -39,7 +39,7 @@ namespace nix_fps_server
                     {
                         Console.WriteLine(p.name + "(" + p.id + ") disconnected");
 
-                        Message message = Message.Create(MessageSendMode.Reliable, MessageId.PlayerDisconnected);
+                        Message message = Message.Create(MessageSendMode.Reliable, ServerToClient.PlayerDisconnected);
                         message.AddUInt(p.id);
                         message.AddString(p.name);
                         
@@ -59,7 +59,7 @@ namespace nix_fps_server
         }
         public void SendConnectedMessage(Player p, ushort toId = ushort.MaxValue)
         {
-            Message message = Message.Create(MessageSendMode.Reliable, MessageId.PlayerConnected);
+            Message message = Message.Create(MessageSendMode.Reliable, ServerToClient.PlayerConnected);
             message.AddUInt(p.id);
             message.AddString(p.name);
             if (toId != ushort.MaxValue)
@@ -82,7 +82,7 @@ namespace nix_fps_server
             }
             playersMissingEnemies.Clear();
         }
-        [MessageHandler((ushort)MessageId.PlayerIdentity)]
+        [MessageHandler((ushort)ClientToServer.PlayerIdentity)]
         static void HandlePlayerIdentity(ushort fromClientId, Message message)
         {
             Console.WriteLine("identity received");
@@ -99,14 +99,17 @@ namespace nix_fps_server
         {
             //if (players.Count == 0)
             //    return;
-            Message message = Message.Create(MessageSendMode.Unreliable, MessageId.AllPlayerData);
+            Message message = Message.Create(MessageSendMode.Unreliable, ServerToClient.AllPlayerData);
             message.AddInt(players.Count);
             foreach (Player player in players)
             {
                 message.AddUInt(player.id);
+                message.AddUInt(player.lastProcessedMesage);
                 message.AddVector3(player.position);
-                message.AddVector3(player.frontDirection);
                 message.AddFloat(player.yaw);
+                message.AddFloat(player.pitch);
+                message.AddByte(player.clipId);
+
                 //Console.WriteLine(players.Count+" id " + player.id + " pos " + player.position + " fd " + player.frontDirection + " y " + player.yaw);
             }
             Program.Server.SendToAll(message);
@@ -114,16 +117,34 @@ namespace nix_fps_server
         }
 
         
-        [MessageHandler((ushort)MessageId.PlayerData)]
+        [MessageHandler((ushort)ClientToServer.PlayerData)]
         private static void HandlePlayerData(ushort fromClientId, Message message)
         {
             var id = message.GetUInt();
             Player p = GetPlayerFromId(id);
-            p.position = message.GetVector3();
-            p.frontDirection = message.GetVector3();
-            p.yaw = message.GetFloat();
-            //Console.WriteLine(p.name +" ("+id+ ") at "+p.position);
-            p.packetCount++;
+
+            var clientState= new ClientInputState();
+            clientState.position = message.GetVector3();
+
+            clientState.messageId = message.GetUInt();
+            clientState.Forward = message.GetBool();
+            clientState.Backward = message.GetBool();
+            clientState.Left = message.GetBool();
+            clientState.Right = message.GetBool();
+            clientState.Sprint = message.GetBool();
+            clientState.Jump = message.GetBool();
+            clientState.Crouch = message.GetBool();
+            clientState.Fire = message.GetBool();
+            clientState.ADS = message.GetBool();
+            clientState.Ability1 = message.GetBool();
+            clientState.Ability2 = message.GetBool();
+            clientState.Ability3 = message.GetBool();
+            clientState.Ability4 = message.GetBool();
+            clientState.yaw = message.GetFloat();
+            clientState.pitch = message.GetFloat();
+
+            clientState.accDeltaTime = message.GetFloat();
+            clientState.ApplyInputTo(p);
         }
         public void ShowPacketCount()
         {

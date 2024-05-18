@@ -3,12 +3,15 @@ using Microsoft.Xna.Framework;
 
 namespace nix_fps_server
 {
-    public enum MessageId : ushort
+    public enum ClientToServer : ushort
+    {
+        PlayerIdentity,
+        PlayerData,
+    }
+    public enum ServerToClient : ushort
     {
         PlayerConnected,
         PlayerDisconnected,
-        PlayerIdentity,
-        PlayerData,
         AllPlayerData
     }
 

@@ -13,10 +13,16 @@ namespace nix_fps_server
         public Vector3 position = Vector3.Zero;
         public Vector3 frontDirection = Vector3.Zero;
         public float yaw;
+        public float pitch;
+        public byte clipId;
+
         public bool connected;
         public bool connectedMessageSent;
         public bool disconnectedMessageSent;
         public int packetCount;
+
+        public uint lastProcessedMesage;
+
         public Player(uint id)
         {
             this.id = id;
