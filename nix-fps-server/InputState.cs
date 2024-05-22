@@ -10,6 +10,8 @@ namespace nix_fps_server
     public class ClientInputState
     {
         public Vector3 position;
+        public Vector3 positionDelta;
+        public bool valid;
         public float yaw;
         public float pitch;
         public byte clipId;
@@ -54,45 +56,59 @@ namespace nix_fps_server
         }
         public ClientInputState() { }
         float speed;
-        public void ApplyInputTo(Player p)
-        {
-            Vector3 tempFront;
+        //public void ApplyInputTo(Player p)
+        //{
+        //    Vector3 tempFront;
 
-            tempFront.X = MathF.Cos(MathHelper.ToRadians(yaw)) * MathF.Cos(MathHelper.ToRadians(pitch));
-            tempFront.Y = MathF.Sin(MathHelper.ToRadians(pitch));
-            tempFront.Z = MathF.Sin(MathHelper.ToRadians(yaw)) * MathF.Cos(MathHelper.ToRadians(pitch));
+        //    tempFront.X = MathF.Cos(MathHelper.ToRadians(yaw)) * MathF.Cos(MathHelper.ToRadians(pitch));
+        //    tempFront.Y = MathF.Sin(MathHelper.ToRadians(pitch));
+        //    tempFront.Z = MathF.Sin(MathHelper.ToRadians(yaw)) * MathF.Cos(MathHelper.ToRadians(pitch));
 
-            p.frontDirection = Vector3.Normalize(tempFront);
+        //    p.frontDirection = Vector3.Normalize(tempFront);
 
-            var frontFlat = Vector3.Normalize(new Vector3(p.frontDirection.X, 0, p.frontDirection.Z));
-            var rightFlat = Vector3.Cross(Vector3.Up, frontFlat);
+        //    var frontFlat = Vector3.Normalize(new Vector3(p.frontDirection.X, 0, p.frontDirection.Z));
+        //    var rightFlat = Vector3.Cross(Vector3.Up, frontFlat);
 
-            Vector3 dir = Vector3.Zero;
-            int dz = 0;
-            int dx = 0;
+        //    Vector3 dir = Vector3.Zero;
+        //    int dz = 0;
+        //    int dx = 0;
 
-            if (Forward)
-                dz++;
-            if (Backward)
-                dz--;
-            if (Left)
-                dx++;
-            if (Right)
-                dx--;
+        //    if (Forward)
+        //        dz++;
+        //    if (Backward)
+        //        dz--;
+        //    if (Left)
+        //        dx++;
+        //    if (Right)
+        //        dx--;
 
-            dir += (dz * frontFlat + dx * rightFlat);
-            speed = 9.5f;
-            if (dz > 0 && Sprint)
-                speed = 18;
+        //    dir += (dz * frontFlat + dx * rightFlat);
+        //    speed = 9.5f;
+        //    if (dz > 0 && Sprint)
+        //        speed = 18;
 
-            if (dir != Vector3.Zero)
-                dir = Vector3.Normalize(dir);
+        //    if (dir != Vector3.Zero)
+        //        dir = Vector3.Normalize(dir);
 
-            p.position += dir * speed * accDeltaTime;
-            p.clipId = 0;
-            p.lastProcessedMesage = messageId;
-        }
+        //    p.position += dir * speed * accDeltaTime;
+        //    p.clipId = 0;
+        //    p.lastProcessedMesage = messageId;
+        //}
     }
 
-
+    public enum PlayerAnimation
+    {
+        idle,
+        runForward,
+        runForwardRight,
+        runForwardLeft,
+        runBackward,
+        runBackwardRight,
+        runBackwardLeft,
+        runRight,
+        runLeft,
+        sprintForward,
+        sprintForwardRight,
+        sprintForwardLeft
+    }
 }

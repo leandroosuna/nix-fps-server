@@ -94,26 +94,35 @@ namespace nix_fps_server
             p.connected = true;
             playersMissingEnemies.Add(p);
         }
-        public int outboundPackets = 0;
+
+        bool packetloss = false;
         public void BroadcastPlayerData()
         {
             //if (players.Count == 0)
             //    return;
             Message message = Message.Create(MessageSendMode.Unreliable, ServerToClient.AllPlayerData);
+            
+            //filter out players that didnt send a new update (caused by framerate lower than server TPS)
+            //var playersToAdd = players.FindAll(p => p.lastMessageAck != p.lastProcessedMesage);
+
+
+            //no update from any player this tick
+            //if (playersToAdd.Count == 0)
+            //    return;
+
             message.AddInt(players.Count);
             foreach (Player player in players)
             {
                 message.AddUInt(player.id);
                 message.AddUInt(player.lastProcessedMesage);
+                message.AddBool(player.lastMovementValid);
                 message.AddVector3(player.position);
                 message.AddFloat(player.yaw);
                 message.AddFloat(player.pitch);
                 message.AddByte(player.clipId);
-
-                //Console.WriteLine(players.Count+" id " + player.id + " pos " + player.position + " fd " + player.frontDirection + " y " + player.yaw);
+                player.outboundPackets++;
             }
             Program.Server.SendToAll(message);
-            outboundPackets++;
         }
 
         
@@ -124,9 +133,12 @@ namespace nix_fps_server
             Player p = GetPlayerFromId(id);
 
             var clientState= new ClientInputState();
-            clientState.position = message.GetVector3();
-
             clientState.messageId = message.GetUInt();
+            
+            clientState.position = message.GetVector3();
+            clientState.positionDelta = message.GetVector3();
+            clientState.yaw = message.GetFloat();
+            clientState.pitch = message.GetFloat();
             clientState.Forward = message.GetBool();
             clientState.Backward = message.GetBool();
             clientState.Left = message.GetBool();
@@ -140,28 +152,86 @@ namespace nix_fps_server
             clientState.Ability2 = message.GetBool();
             clientState.Ability3 = message.GetBool();
             clientState.Ability4 = message.GetBool();
-            clientState.yaw = message.GetFloat();
-            clientState.pitch = message.GetFloat();
+            //clientState.accDeltaTime = message.GetFloat();
+            clientState = ValidateInput(clientState);
+            
+            p.Apply(clientState);
+            //clientState.ApplyInputTo(p);
 
-            clientState.accDeltaTime = message.GetFloat();
-            clientState.ApplyInputTo(p);
+        }
+        public static ClientInputState ValidateInput(ClientInputState state)
+        {
+            float validDelta = 0.005f; //expected delta time
+            validDelta *= (state.Sprint ? 18f : 9.5f); //speed modifier
+            validDelta += 0.015f; //error margin
+
+            state.valid = true;
+            var len = state.positionDelta.Length();
+            if (len < validDelta)
+                return state;
+
+            var diff = len - validDelta;
+            state.valid = false;
+
+            state.positionDelta.Normalize();
+            state.positionDelta *= diff;
+            
+            state.position -= state.positionDelta;
+            return state;
+
+        }
+        public void ShowStatus()
+        {
+            var str = "Server status";
+            if (Program.Server.IsRunning)
+            {
+                str += " ONLINE    TPS "+Program.ServerTPS + "    players online "+Program.Server.ClientCount + "/"+players.Count+" max "+Program.Server.MaxClientCount;
+            }
+            else
+                str += " OFFLINE";
+            
+            Console.SetCursorPosition(0, 0);
+            Console.Write(str);
+
+            
+            str = "Mode -    Map -    Time -    State - ";
+
+            Console.SetCursorPosition(0, 1);
+            Console.Write(str);
         }
         public void ShowPacketCount()
         {
-            int count = 0;
+            var line = 2;
+            Console.SetCursorPosition(0, 2);
+
+            int countIn = 0;
+            int countOut = 0;
             foreach(var c in Program.Server.Clients)
             {
-                count += c.Metrics.UnreliableIn;
-                var player = GetPlayerFromNetId(c.Id);
-                Console.WriteLine(player.name + " " + c.Metrics.UnreliableIn + " pps in");
+                countIn += c.Metrics.UnreliableIn;
+                countOut += c.Metrics.UnreliableOut;
             }
-            Console.WriteLine("total pps in" + count); 
+            Console.Write("total IO " + countIn + " - " + countOut);
+            line++;
+            foreach(var c in Program.Server.Clients)
+            {
+                var player = GetPlayerFromNetId(c.Id);
+                Console.SetCursorPosition(0, line);
+                Console.Write(player.name + " IO " + c.Metrics.UnreliableIn + " - " + player.outboundPackets + " - " + c.Metrics.UnreliableOut + " RTT " + c.RTT + " ms   lv " + player.lastMovementValid);
+                
+                line++;
+            }
+             
         }
         public void ClearPacketCount()
         {
             foreach (var c in Program.Server.Clients)
             {
                 c.Metrics.Reset();
+            }
+            foreach(var p in players)
+            {
+                p.outboundPackets = 0;
             }
         }
         public static void HandleConnect(ushort id)

@@ -1,4 +1,5 @@
 ﻿using Microsoft.Xna.Framework;
+using Newtonsoft.Json.Linq;
 using Riptide;
 using Riptide.Utils;
 using System.Diagnostics;
@@ -10,9 +11,11 @@ namespace nix_fps_server
         public static Server Server;
         static NetworkManager networkManager;
 
-        static int ServerFREQ = 200;
+        public static uint ServerTPS;
+        public static JObject CFG;
         static void Main(string[] args)
         {
+            CFG = JObject.Parse(File.ReadAllText("app-settings.json"));
 
             RiptideLogger.Initialize(Console.WriteLine, false);
             networkManager = new NetworkManager();
@@ -21,12 +24,20 @@ namespace nix_fps_server
             Server.ClientConnected += (s, e) => NetworkManager.HandleConnect(e.Client.Id);
             Server.ClientDisconnected += (s, e) => NetworkManager.HandleDisconnect(e.Client.Id);
 
+            if (!CFG.ContainsKey("ServerTPS"))
+            {
+                CFG["ServerTPS"] = (uint)200;
 
+                File.WriteAllText("app-settings.json", CFG.ToString());
+            }
+            ServerTPS = CFG["ServerTPS"].Value<uint>();
+            var targetms = (1000 / ServerTPS);
+            
+            
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
             while (true) {
-                if(stopwatch.ElapsedMilliseconds >= 5) //200tps
-                //if (stopwatch.ElapsedMilliseconds >= 1) //1000tps
+                if (stopwatch.ElapsedMilliseconds >= targetms) 
                 {
                     ServerUpdate();
                     stopwatch.Restart();
@@ -42,19 +53,13 @@ namespace nix_fps_server
             networkManager.Update();
             t++;
 
-            //if (t == 1000) //1 sec at 1000 tps
-            if (t == 200) //1 sec at 200 tps
+            if (t == ServerTPS) //1 sec 
             {
                 t = 0;
+                Console.Clear();
+                networkManager.ShowStatus();
                 networkManager.ShowPacketCount();
                 networkManager.ClearPacketCount();
-                //Console.WriteLine("outbound packets " + networkManager.outboundPackets);
-                networkManager.outboundPackets = 0;
-                foreach (var c in Server.Clients)
-                {
-
-                    Console.WriteLine(NetworkManager.GetPlayerFromNetId(c.Id).name + " RTT " + c.RTT);
-                }
             }
         }
     }
