@@ -13,6 +13,7 @@ namespace nix_fps_server
 
         public static uint ServerTPS;
         public static JObject CFG;
+        public static long syncErrorMs = 0;
         static void Main(string[] args)
         {
             CFG = JObject.Parse(File.ReadAllText("app-settings.json"));
@@ -37,11 +38,15 @@ namespace nix_fps_server
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
             while (true) {
-                if (stopwatch.ElapsedMilliseconds >= targetms) 
+                var ms = stopwatch.ElapsedMilliseconds;
+                var currentTargetMs = targetms + syncErrorMs;
+                if (ms >= currentTargetMs) 
                 {
+                    syncErrorMs = (ms - currentTargetMs);
                     ServerUpdate();
                     stopwatch.Restart();
                 }
+                Thread.Sleep(1);
             };
         }
 
@@ -60,6 +65,7 @@ namespace nix_fps_server
                 networkManager.ShowStatus();
                 networkManager.ShowPacketCount();
                 networkManager.ClearPacketCount();
+                
             }
         }
     }
