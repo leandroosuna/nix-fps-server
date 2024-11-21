@@ -10,6 +10,7 @@ namespace nix_fps_server
         public ushort netId;
         public short RTT;
 
+        public Vector3 lastPosition = Vector3.Zero;
         public Vector3 position = Vector3.Zero;
         public float yaw;
         public float pitch;

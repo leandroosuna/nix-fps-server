@@ -9,47 +9,13 @@ namespace nix_fps_server
     {
         static List<Player> players = new List<Player>();
         static List<Player> playersMissingEnemies = new List<Player>();
-        
 
         public void Update()
         {
-            CheckPlayerMissingEnemies();
-            CheckPlayerConnectionState();
             CheckRTT();
             BroadcastPlayerData();
         }
-        public void CheckPlayerConnectionState()
-        {
-            foreach(Player p in players)
-            {
-                if(p.connected)
-                {
-                    if (!p.connectedMessageSent)
-                    { 
-                        Console.WriteLine(p.name +"("+p.id+") connected");
-
-                        SendConnectedMessage(p);
-                        p.connectedMessageSent = true;
-                        p.disconnectedMessageSent = false;
-                    }
-                }
-                else
-                {
-                    if(!p.disconnectedMessageSent)
-                    {
-                        Console.WriteLine(p.name + "(" + p.id + ") disconnected");
-
-                        Message message = Message.Create(MessageSendMode.Reliable, ServerToClient.PlayerDisconnected);
-                        message.AddUInt(p.id);
-                        message.AddString(p.name);
-                        
-                        Program.Server.SendToAll(message);
-                        p.disconnectedMessageSent = true;
-                        p.connectedMessageSent = false;
-                    }
-                }
-            }
-        }
+        
         void CheckRTT()
         {
             foreach(var c in Program.Server.Clients)
@@ -57,31 +23,7 @@ namespace nix_fps_server
                 GetPlayerFromNetId(c.Id).RTT = c.RTT;
             }
         }
-        public void SendConnectedMessage(Player p, ushort toId = ushort.MaxValue)
-        {
-            Message message = Message.Create(MessageSendMode.Reliable, ServerToClient.PlayerConnected);
-            message.AddUInt(p.id);
-            message.AddString(p.name);
-            if (toId != ushort.MaxValue)
-                Program.Server.Send(message, toId);
-            else
-                Program.Server.SendToAll(message);
-        }
         
-        public void CheckPlayerMissingEnemies()
-        {
-            foreach(Player pme in playersMissingEnemies) {  
-                foreach(Player p in players)
-                {
-                    if (p.id != pme.id)
-                    {
-                        Console.WriteLine(pme.name + " was missing " + p.name);
-                        SendConnectedMessage(p, pme.netId);
-                    }
-                }
-            }
-            playersMissingEnemies.Clear();
-        }
         [MessageHandler((ushort)ClientToServer.PlayerIdentity)]
         static void HandlePlayerIdentity(ushort fromClientId, Message message)
         {
@@ -111,16 +53,20 @@ namespace nix_fps_server
             //    return;
 
             message.AddInt(players.Count);
-            foreach (Player player in players)
+            foreach (Player p in players)
             {
-                message.AddUInt(player.id);
-                message.AddUInt(player.lastProcessedMesage);
-                message.AddBool(player.lastMovementValid);
-                message.AddVector3(player.position);
-                message.AddFloat(player.yaw);
-                message.AddFloat(player.pitch);
-                message.AddByte(player.clipId);
-                player.outboundPackets++;
+                message.AddUInt(p.id);
+                message.AddBool(p.connected);
+                if (p.connected)
+                { 
+                    message.AddUInt(p.lastProcessedMesage);
+                    message.AddBool(p.lastMovementValid);
+                    message.AddVector3(p.position);
+                    message.AddFloat(p.yaw);
+                    message.AddFloat(p.pitch);
+                    message.AddByte(p.clipId);
+                }
+                p.outboundPackets++;
             }
             Program.Server.SendToAll(message);
         }
@@ -161,24 +107,27 @@ namespace nix_fps_server
         }
         public static ClientInputState ValidateInput(ClientInputState state)
         {
-            float validDelta = 0.005f; //expected delta time
-            validDelta *= (state.Sprint ? 18f : 9.5f); //speed modifier
-            validDelta += 0.015f; //error margin
+            //float validDelta = 0.005f; //expected delta time
+            //validDelta *= (state.Sprint ? 18f : 9.5f); //speed modifier
+            //validDelta += 0.015f; //error margin
+
+            //state.valid = true;
+            //var len = state.positionDelta.Length();
+            //if (len < validDelta)
+            //    return state;
+
+            //var diff = len - validDelta;
+            //state.valid = false;
+
+            //state.positionDelta.Normalize();
+            //state.positionDelta *= diff;
+
+            //state.position -= state.positionDelta;
+            //return state;
+
 
             state.valid = true;
-            var len = state.positionDelta.Length();
-            if (len < validDelta)
-                return state;
-
-            var diff = len - validDelta;
-            state.valid = false;
-
-            state.positionDelta.Normalize();
-            state.positionDelta *= diff;
-            
-            state.position -= state.positionDelta;
             return state;
-
         }
         public void ShowStatus()
         {
@@ -202,7 +151,7 @@ namespace nix_fps_server
         public void ShowPacketCount()
         {
             var line = 2;
-            Console.SetCursorPosition(0, 2);
+            //Console.SetCursorPosition(0, 2);
 
             int countIn = 0;
             int countOut = 0;
@@ -211,16 +160,20 @@ namespace nix_fps_server
                 countIn += c.Metrics.UnreliableIn;
                 countOut += c.Metrics.UnreliableOut;
             }
-            Console.Write("total IO " + countIn + " - " + countOut);
+            //Console.Write("total IO " + countIn + " - " + countOut);
             line++;
             foreach(var c in Program.Server.Clients)
             {
                 var player = GetPlayerFromNetId(c.Id);
-                Console.SetCursorPosition(0, line);
-                Console.Write(player.name + " IO " + c.Metrics.UnreliableIn + " - " + player.outboundPackets + " - " + c.Metrics.UnreliableOut + " RTT " + c.RTT + " ms   lv " + player.lastMovementValid);
-                
+                //Console.SetCursorPosition(0, line);
+                //Console.WriteLine(player.name + " IO " + c.Metrics.UnreliableIn + " - " + player.outboundPackets + " - " + c.Metrics.UnreliableOut + " RTT " + c.RTT + " ms   lv " + player.lastMovementValid);
+                Console.WriteLine(player.name + " IO " + c.Metrics.UnreliableIn + " - " + 
+                    player.outboundPackets + " - " + c.Metrics.UnreliableOut + " RTT " + c.RTT + " ms " + (int)player.position.X + " " + (int)player.position.Y + " " + (int)player.position.Z);
+
                 line++;
             }
+
+
              
         }
         public void ClearPacketCount()

@@ -39,7 +39,7 @@ namespace nix_fps_server
             stopwatch.Start();
             while (true) {
                 var ms = stopwatch.ElapsedMilliseconds;
-                var currentTargetMs = targetms + syncErrorMs;
+                var currentTargetMs = targetms - syncErrorMs;
                 if (ms >= currentTargetMs) 
                 {
                     syncErrorMs = (ms - currentTargetMs);
@@ -47,6 +47,7 @@ namespace nix_fps_server
                     stopwatch.Restart();
                 }
                 Thread.Sleep(1);
+                 
             };
         }
 
@@ -61,8 +62,8 @@ namespace nix_fps_server
             if (t == ServerTPS) //1 sec 
             {
                 t = 0;
-                Console.Clear();
-                networkManager.ShowStatus();
+                //Console.Clear();
+                //networkManager.ShowStatus();
                 networkManager.ShowPacketCount();
                 networkManager.ClearPacketCount();
                 
