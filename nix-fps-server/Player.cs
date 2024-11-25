@@ -16,6 +16,10 @@ namespace nix_fps_server
         public float pitch;
         public byte clipId;
 
+        public byte health = 150;
+        public byte hitLocation;
+        public uint damagerId;
+
         public bool connected;
         public bool connectedMessageSent;
         public bool disconnectedMessageSent;

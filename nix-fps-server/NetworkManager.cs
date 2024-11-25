@@ -9,7 +9,12 @@ namespace nix_fps_server
     {
         static List<Player> players = new List<Player>();
         static List<Player> playersMissingEnemies = new List<Player>();
+        static List<Gun> guns = new List<Gun>();
 
+        public void Init()
+        {
+            guns.Add(new Gun("AR", 150, 40, 25));
+        }
         public void Update()
         {
             CheckRTT();
@@ -65,8 +70,17 @@ namespace nix_fps_server
                     message.AddFloat(p.yaw);
                     message.AddFloat(p.pitch);
                     message.AddByte(p.clipId);
+                    message.AddByte(p.health);
+                    message.AddByte(p.hitLocation);
+                    message.AddUInt(p.damagerId);
                 }
                 p.outboundPackets++;
+
+                if(p.health == 0)
+                {
+                    //just killed, restore hp after sending this last message
+                    p.health = 150;
+                }
             }
             Program.Server.SendToAll(message);
         }
@@ -85,6 +99,9 @@ namespace nix_fps_server
             clientState.positionDelta = message.GetVector3();
             clientState.yaw = message.GetFloat();
             clientState.pitch = message.GetFloat();
+            var hitLocation = message.GetByte();
+            var gunId = message.GetByte();
+            var enemyId = message.GetUInt();
             clientState.Forward = message.GetBool();
             clientState.Backward = message.GetBool();
             clientState.Left = message.GetBool();
@@ -102,6 +119,8 @@ namespace nix_fps_server
             clientState = ValidateInput(clientState);
             
             p.Apply(clientState);
+
+            ApplyHit(p.id, enemyId, gunId, hitLocation);
             //clientState.ApplyInputTo(p);
 
         }
@@ -129,6 +148,50 @@ namespace nix_fps_server
             state.valid = true;
             return state;
         }
+        
+
+        public static void ApplyHit(uint damager, uint player, byte gunId, byte hitLocation)
+        {
+            Player p = GetPlayerFromId(player);
+
+            if (hitLocation <= 0) {
+                
+                p.hitLocation = hitLocation;
+                return;
+            };
+
+            if (gunId >= guns.Count) return;
+
+            var gun = guns[gunId];
+            
+            
+            switch(hitLocation)
+            {
+                case 1:
+                    Damage(p, gun.GetHeadDamage()); break;
+                case 2:
+                    Damage(p, gun.GetBodyDamage()); break;
+                case 3:
+                    Damage(p, gun.GetLegDamage()); break;
+
+            }
+            p.hitLocation = hitLocation;
+            p.damagerId = damager;
+
+        }
+
+        public static void Damage(Player p, byte damage)
+        {
+            if (p.health - damage <= 0)
+            {
+                p.health = 0;
+            }
+            else
+                p.health -= damage;
+
+            
+        }
+
         public void ShowStatus()
         {
             var str = "Server status";
@@ -167,7 +230,7 @@ namespace nix_fps_server
                 var player = GetPlayerFromNetId(c.Id);
                 //Console.SetCursorPosition(0, line);
                 //Console.WriteLine(player.name + " IO " + c.Metrics.UnreliableIn + " - " + player.outboundPackets + " - " + c.Metrics.UnreliableOut + " RTT " + c.RTT + " ms   lv " + player.lastMovementValid);
-                Console.WriteLine(player.name + " IO " + c.Metrics.UnreliableIn + " - " + 
+                Console.WriteLine(player.name +" "+ player.id+ " IO " + c.Metrics.UnreliableIn + " - " + 
                     player.outboundPackets + " - " + c.Metrics.UnreliableOut + " RTT " + c.RTT + " ms " + (int)player.position.X + " " + (int)player.position.Y + " " + (int)player.position.Z);
 
                 line++;

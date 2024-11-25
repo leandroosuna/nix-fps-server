@@ -28,6 +28,7 @@ namespace nix_fps_server
             
             RiptideLogger.Initialize(Console.WriteLine, false);
             networkManager = new NetworkManager();
+            networkManager.Init();
             Server = new Server();
             Server.Start(7777, 8);
             Server.ClientConnected += (s, e) => NetworkManager.HandleConnect(e.Client.Id);
