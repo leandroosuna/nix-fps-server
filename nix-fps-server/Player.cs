@@ -28,6 +28,12 @@ namespace nix_fps_server
 
         public uint outboundPackets = 0;
         public bool lastMovementValid = false;
+
+        public byte gunId;
+        public bool fired;
+        public uint kills = 0;
+        public uint deaths = 0;
+
         public Player(uint id)
         {
             this.id = id;

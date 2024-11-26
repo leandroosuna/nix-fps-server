@@ -74,7 +74,7 @@ namespace nix_fps_server
 
                 //Console.WriteLine($"{dt:HH:mm:ss.fff} [TPS = {tps:###.##} : {perc:###.##}%]" );
                 Console.WriteLine($"{dt:HH:mm:ss.fff} [TPS = {Math.Round(tps)} : {Math.Round(perc)}%]" );
-
+               
                 lastDt = dt;
 
                 //Console.Clear();

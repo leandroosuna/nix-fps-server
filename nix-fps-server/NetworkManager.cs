@@ -13,7 +13,9 @@ namespace nix_fps_server
 
         public void Init()
         {
-            guns.Add(new Gun("AR", 150, 40, 25));
+            guns.Add(new Gun("rifle", 150, 40, 25));
+            guns.Add(new Gun("pistol", 100, 20, 10));
+
         }
         public void Update()
         {
@@ -73,6 +75,10 @@ namespace nix_fps_server
                     message.AddByte(p.health);
                     message.AddByte(p.hitLocation);
                     message.AddUInt(p.damagerId);
+                    message.AddByte(p.fired?p.gunId:(byte)0);
+                    message.AddUInt(p.kills);
+                    message.AddUInt(p.deaths);
+
                 }
                 p.outboundPackets++;
 
@@ -119,7 +125,8 @@ namespace nix_fps_server
             clientState = ValidateInput(clientState);
             
             p.Apply(clientState);
-
+            p.gunId = gunId;
+            p.fired = clientState.Fire;
             ApplyHit(p.id, enemyId, gunId, hitLocation);
             //clientState.ApplyInputTo(p);
 
@@ -160,35 +167,45 @@ namespace nix_fps_server
                 return;
             };
 
-            if (gunId >= guns.Count) return;
 
-            var gun = guns[gunId];
-            
-            
+            if (gunId <= 0 || gunId > guns.Count - 1) return;
+
+            var gun = guns[gunId - 1];
+
+            bool killed = false;
             switch(hitLocation)
             {
                 case 1:
-                    Damage(p, gun.GetHeadDamage()); break;
+                    killed = Damage(p, gun.GetHeadDamage()); break;
                 case 2:
-                    Damage(p, gun.GetBodyDamage()); break;
+                    killed = Damage(p, gun.GetBodyDamage()); break;
                 case 3:
-                    Damage(p, gun.GetLegDamage()); break;
+                    killed = Damage(p, gun.GetLegDamage()); break;
 
             }
             p.hitLocation = hitLocation;
             p.damagerId = damager;
+            if(killed)
+            {
+                Player ep = GetPlayerFromId(damager);
+                ep.kills++;
+                p.deaths++;
+            }
 
         }
 
-        public static void Damage(Player p, byte damage)
+        public static bool Damage(Player p, byte damage)
         {
             if (p.health - damage <= 0)
             {
                 p.health = 0;
+                return true;
+
             }
             else
                 p.health -= damage;
 
+            return false;
             
         }
 
@@ -225,14 +242,15 @@ namespace nix_fps_server
             }
             //Console.Write("total IO " + countIn + " - " + countOut);
             line++;
-            foreach(var c in Program.Server.Clients)
+            foreach (var c in Program.Server.Clients)
             {
                 var player = GetPlayerFromNetId(c.Id);
                 //Console.SetCursorPosition(0, line);
                 //Console.WriteLine(player.name + " IO " + c.Metrics.UnreliableIn + " - " + player.outboundPackets + " - " + c.Metrics.UnreliableOut + " RTT " + c.RTT + " ms   lv " + player.lastMovementValid);
-                Console.WriteLine(player.name +" "+ player.id+ " IO " + c.Metrics.UnreliableIn + " - " + 
-                    player.outboundPackets + " - " + c.Metrics.UnreliableOut + " RTT " + c.RTT + " ms " + (int)player.position.X + " " + (int)player.position.Y + " " + (int)player.position.Z);
-
+                Console.WriteLine($"{player.name} {player.id} IO {c.Metrics.UnreliableIn}-{c.Metrics.UnreliableOut}  RTT " +
+                    $" {c.RTT} ms KD {player.kills}/{player.deaths}"
+                    //+ (int)player.position.X + " " + (int)player.position.Y + " " + (int)player.position.Z);
+                    );
                 line++;
             }
 
