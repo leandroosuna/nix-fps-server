@@ -1,4 +1,5 @@
 ﻿using Microsoft.Xna.Framework;
+using Newtonsoft.Json.Linq;
 using Riptide;
 using Riptide.Utils;
 using System.Collections.Generic;
@@ -8,9 +9,10 @@ namespace nix_fps_server
     public class NetworkManager
     {
         static List<Player> players = new List<Player>();
-        static List<Player> playersMissingEnemies = new List<Player>();
         static List<Gun> guns = new List<Gun>();
+        static Queue<(uint p1, uint p2, byte gun)> killFeed = new Queue<(uint p1, uint p2, byte gun)>();
 
+        static List<Player> playersJustJoined = new List<Player>();
         public void Init()
         {
             guns.Add(new Gun("rifle", 150, 40, 25));
@@ -20,7 +22,9 @@ namespace nix_fps_server
         public void Update()
         {
             CheckRTT();
+            CheckPlayersJustJoined();
             BroadcastPlayerData();
+            BroadcastKillFeed();
         }
         
         void CheckRTT()
@@ -31,17 +35,73 @@ namespace nix_fps_server
             }
         }
         
+        void CheckPlayersJustJoined()
+        {
+            var othersCount = (uint)players.Count - 1;
+
+            foreach(var p in playersJustJoined)
+            {
+                Message newName = Message.Create(MessageSendMode.Reliable, ServerToClient.PlayerName);
+                newName.AddUInt(1);
+                newName.AddUInt(p.id);
+                newName.AddString(p.name);
+
+                Program.Server.SendToAll(newName, p.netId);
+
+                if(othersCount > 0)
+                {
+                    Message names = Message.Create(MessageSendMode.Reliable, ServerToClient.PlayerName);
+                    names.AddUInt(othersCount);
+                
+                    foreach(var op in players)
+                    {                    
+                        if (op.id != p.id)
+                        {
+                            names.AddUInt(op.id);
+                            names.AddString(op.name);
+                        }
+                    }
+                    Program.Server.Send(names, p.netId);
+                }
+            }
+
+            playersJustJoined.Clear();
+        }
+        void BroadcastKillFeed()
+        {
+            if(killFeed.Count > 0)
+            {
+                var kf = killFeed.Dequeue();
+                Message m = Message.Create(MessageSendMode.Reliable, ServerToClient.KillFeed);
+                m.AddUInt(kf.p1);
+                m.AddUInt(kf.p2);
+                m.AddByte(kf.gun);
+
+                Program.Server.SendToAll(m);
+            }
+        }
         [MessageHandler((ushort)ClientToServer.PlayerIdentity)]
         static void HandlePlayerIdentity(ushort fromClientId, Message message)
         {
-            Console.WriteLine("identity received");
+            //Console.WriteLine("identity received");
             var playerId = message.GetUInt();
             var playerName = message.GetString();
+            var version = message.GetInt();
+
+            var current = Program.CFG["Version"].Value<int>();
+            if (version != current)
+            {
+                Program.Server.DisconnectClient(fromClientId);
+                //Console.WriteLine($"id {playerId} wrong version: {version} -> (current {current})");
+                return;
+            }
+
             Player p = GetPlayerFromId(playerId, true);
             p.name = playerName;
             p.netId = fromClientId;
             p.connected = true;
-            playersMissingEnemies.Add(p);
+
+            playersJustJoined.Add(p);
         }
 
         bool packetloss = false;
@@ -68,6 +128,7 @@ namespace nix_fps_server
                 { 
                     message.AddUInt(p.lastProcessedMesage);
                     message.AddBool(p.lastMovementValid);
+                    message.AddVector3(p.color);
                     message.AddVector3(p.position);
                     message.AddFloat(p.yaw);
                     message.AddFloat(p.pitch);
@@ -101,6 +162,7 @@ namespace nix_fps_server
             var clientState= new ClientInputState();
             clientState.messageId = message.GetUInt();
             
+            var color = message.GetVector3();
             clientState.position = message.GetVector3();
             clientState.positionDelta = message.GetVector3();
             clientState.yaw = message.GetFloat();
@@ -128,6 +190,8 @@ namespace nix_fps_server
             p.gunId = gunId;
             p.fired = clientState.Fire;
             ApplyHit(p.id, enemyId, gunId, hitLocation);
+
+            p.color = color;
             //clientState.ApplyInputTo(p);
 
         }
@@ -168,7 +232,7 @@ namespace nix_fps_server
             };
 
 
-            if (gunId <= 0 || gunId > guns.Count - 1) return;
+            if (gunId <= 0 || gunId > guns.Count) return;
 
             var gun = guns[gunId - 1];
 
@@ -190,6 +254,8 @@ namespace nix_fps_server
                 Player ep = GetPlayerFromId(damager);
                 ep.kills++;
                 p.deaths++;
+
+                killFeed.Enqueue((damager, player, gunId));
             }
 
         }
@@ -270,9 +336,10 @@ namespace nix_fps_server
         }
         public static void HandleConnect(ushort id)
         {
-            //var player = GetPlayerFromNetId(id);
-            //player.connected = true;
-            //Console.WriteLine("handle connect");
+            Message m = Message.Create(MessageSendMode.Reliable, ServerToClient.Version);
+            var v = Program.CFG["Version"].Value<int>();
+            m.AddInt(v);
+            Program.Server.Send(m, id);
         }
         public static void HandleDisconnect(ushort id)
         {

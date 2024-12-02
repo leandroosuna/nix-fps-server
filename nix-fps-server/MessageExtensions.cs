@@ -10,7 +10,10 @@ namespace nix_fps_server
     }
     public enum ServerToClient : ushort
     {
-        AllPlayerData
+        AllPlayerData,
+        PlayerName,
+        Version,
+        KillFeed
     }
 
     public static class MessageExtensions

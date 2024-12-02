@@ -34,6 +34,7 @@ namespace nix_fps_server
         public uint kills = 0;
         public uint deaths = 0;
 
+        public Vector3 color;
         public Player(uint id)
         {
             this.id = id;

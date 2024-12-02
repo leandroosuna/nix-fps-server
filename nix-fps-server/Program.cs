@@ -26,11 +26,12 @@ namespace nix_fps_server
         {
             CFG = JObject.Parse(File.ReadAllText("app-settings.json"));
             
-            RiptideLogger.Initialize(Console.WriteLine, false);
+            //RiptideLogger.Initialize(Console.WriteLine, true);
+            RiptideLogger.Initialize(LogDebug, LogInfo, LogWarning, LogError, false);
             networkManager = new NetworkManager();
             networkManager.Init();
             Server = new Server();
-            Server.Start(7777, 8);
+            Server.Start(7777, 30);
             Server.ClientConnected += (s, e) => NetworkManager.HandleConnect(e.Client.Id);
             Server.ClientDisconnected += (s, e) => NetworkManager.HandleDisconnect(e.Client.Id);
 
@@ -48,6 +49,8 @@ namespace nix_fps_server
             timerId = timeSetEvent(TargetMS, 0, callback, IntPtr.Zero, 1);
             Console.WriteLine("Server started. Press Enter to exit.");
             Console.ReadLine();
+
+            
 
         }
         private static void TimerElapsed(uint id, uint msg, IntPtr user, IntPtr param1, IntPtr param2)
@@ -81,8 +84,24 @@ namespace nix_fps_server
                 //networkManager.ShowStatus();
                 networkManager.ShowPacketCount();
                 networkManager.ClearPacketCount();
-                
+                   
             }
+        }
+        static void LogWarning(string msg)
+        {
+            Console.WriteLine("WARN "+msg);
+        }
+        static void LogDebug(string msg)
+        {
+            Console.WriteLine("DEBUG " + msg);
+        }
+        static void LogInfo(string msg)
+        {
+            Console.WriteLine("INFO " + msg);
+        }
+        static void LogError(string msg)
+        {
+            Console.WriteLine("ERROR " + msg);
         }
     }
 }
